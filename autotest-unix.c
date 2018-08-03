@@ -36,16 +36,16 @@
 #	endif
 #endif
 
-static int discover_symbols(const char *arg0, test_case **cases, const dyn_ent_t *dynent, void *base_addr) {
-	int status = 1;
+static void discover_symbols(const char *arg0, test_case **cases, const dyn_ent_t *dynent, void *base_addr) {
 	const sym_ent_t *symtab = NULL;
 	const char *strtab = NULL;
-
-	void *hashtable;
+	void *hashtable = NULL;
 	int hashtable_type = 0;
 	size_t i;
 	size_t num_entries = 0;
 	test_case *tcase = NULL;
+
+	(void) arg0; /* not needed - we pull symbols directly from memory */
 
 	*cases = NULL;
 
@@ -70,20 +70,9 @@ static int discover_symbols(const char *arg0, test_case **cases, const dyn_ent_t
 		}
 	}
 
-	if (symtab == NULL) {
-		fprintf(stderr, "%s: error: main executable has no symbol table (spooky things are happening)\n", arg0);
-		goto exit;
-	}
-
-	if (strtab == NULL) {
-		fprintf(stderr, "%s: error: main executable has no string table (spooky things are happening)\n", arg0);
-		goto exit;
-	}
-
-	if (hashtable_type == 0) {
-		fprintf(stderr, "%s: error: main executable has no symbol hash table (spooky things are happening)\n", arg0);
-		goto exit;
-	}
+	if (symtab == NULL) bailout("Main executable has no symbol table (spooky things are happening)");
+	if (strtab == NULL) bailout("Main executable has no string table (spooky things are happening)");
+	if (hashtable_type == 0) bailout("Main executable has no symbol hash table (spooky things are happening)");
 
 	if (hashtable_type == 1) {
 		num_entries = ((const uint32_t *) hashtable)[1];
@@ -155,30 +144,11 @@ static int discover_symbols(const char *arg0, test_case **cases, const dyn_ent_t
 			tcase = c;
 		}
 	}
-
-	status = 0;
-exit:
-	return status;
 }
 
-int discover_tests(const char *arg0, test_case **cases) {
-	int status = 1;
-	struct link_map *map;
-
-	map = dlopen(NULL, RTLD_LAZY);
-	if (map == NULL) {
-		fprintf(stderr, "%s: error: could not open main EXE dl object: %s\n", arg0, dlerror());
-		goto exit;
-	}
-
+void discover_tests(const char *arg0, test_case **cases) {
+	struct link_map *map = dlopen(NULL, RTLD_LAZY);
+	if (map == NULL) bailout("Could not open main EXE dl object: %s", dlerror());
 	while (map->l_prev) map = map->l_prev;
-
-	if (discover_symbols(arg0, cases, map->l_ld, (void *) map->l_addr) != 0) {
-		/* error already emitted */
-		goto exit;
-	}
-
-	status = 0;
-exit:
-	return status;
+	discover_symbols(arg0, cases, map->l_ld, (void *) map->l_addr);
 }

@@ -17,8 +17,6 @@
 #define AUTOTEST_BUILDING
 #include "./autotest.h"
 
-extern int discover_tests(const char *arg0, test_case **cases);
-
 static jmp_buf jmpbuf_harness;
 static jmp_buf jmpbuf_test;
 static FILE *real_stdout;
@@ -30,6 +28,7 @@ __attribute__((noreturn)) void bailout(const char *fmt, ...) {
 	va_start(ap, fmt);
 	vfprintf(real_stdout, fmt, ap);
 	va_end(ap);
+	fputs("\n", real_stdout);
 	longjmp(jmpbuf_harness, 1);
 	__builtin_unreachable();
 }
@@ -45,7 +44,6 @@ static void handle_sig(int sig) {
 }
 
 int main(int argc, const char **argv) {
-	int result;
 	test_case *test_cases;
 
 	(void) argc;
@@ -75,12 +73,7 @@ int main(int argc, const char **argv) {
 		return 1;
 	}
 
-	/* get test cases */
-	result = discover_tests(argv[0], &test_cases);
-	if (result != 0) {
-		/* test case discovery should have printed the error already */
-		return result;
-	}
+	discover_tests(argv[0], &test_cases);
 
 	fputs("TAP version 13\n", real_stdout);
 

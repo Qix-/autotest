@@ -6,13 +6,15 @@
 #	error "You don't need to include autotest.h - just link against the library."
 #endif
 
-void bailout(const char *fmt, ...) __attribute__((noreturn));
-
 typedef struct test_case {
 	void (*fn)(void);
 	const char *name;
 	int skipped;
 	struct test_case *next;
 } test_case;
+
+__attribute__((noreturn)) void bailout(const char *fmt, ...);
+
+void discover_tests(const char *arg0, test_case **cases);
 
 #endif
