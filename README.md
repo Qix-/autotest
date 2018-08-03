@@ -37,9 +37,43 @@ not ok 2 bar
 
 Assertions should use C's built-in `assert()` (from `assert.h`), or any `abort()`-based assertion library.
 
-> **NOTE:** 
-
 > **NOTE:** Do not specify a `main()` function - Autotest provides one for you.
+
+### Ignoring `SIGABRT` or `SIGSEGV`
+
+If you want to allow either a `SIGSEGV` (segfault) or `SIGABRT` (abort, e.g. when calling `assert(0)`), add
+`SEGV_` and/or `ABRT_` after `TEST_`, respectively.
+
+```c
+#include <assert.h>
+
+void TEST_SEGV_test_segault(void) {
+	int *literally_death = (int *) 0x0;
+	*literally_death = 0xDEADBEEF; /* segfault; ignored, test will pass */
+}
+
+void TEST_ABRT_test_abort(void) {
+	assert(!"This will cause the test to fail"); /* abort; ignoreed, test will pass */
+}
+```
+
+Note that this doesn't _expect_ the test to fail; see below for how to do that.
+
+### Expecting failures
+
+If you want to _expect_ that a test fails, add `FAIL_` after `TEST_`.
+
+```c
+#include <assert.h>
+
+void TEST_FAIL_test_abort_should_pass(void) {
+	assert(!"This should pass");
+}
+
+void TEST_FAIL_test_abort_should_pass(void) {
+	/* doesn't segfault/abort - test will FAIL */
+}
+```
 
 ## Building
 
