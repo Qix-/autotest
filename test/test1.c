@@ -1,7 +1,7 @@
 #include <assert.h>
 #include <stdio.h>
 
-__attribute__ ((visibility ("default"))) void TEST_hello(void) {
+void TEST_hello(void) {
 	puts("Hello, world!");
 }
 
