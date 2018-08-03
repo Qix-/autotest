@@ -45,6 +45,7 @@ static void handle_sig(int sig) {
 
 int main(int argc, const char **argv) {
 	test_case *test_cases;
+	volatile int had_failure = 0;
 
 	(void) argc;
 
@@ -108,9 +109,11 @@ int main(int argc, const char **argv) {
 					fprintf(real_stdout, "ok %lu %s\n", num_cases, tcase->name);
 					break;
 				case 1:
+					had_failure = 1;
 					fprintf(real_stdout, "not ok %lu %s\n  ---\n  message: Test case aborted\n  severity: fail\n  ...\n", num_cases, tcase->name);
 					break;
 				case 2:
+					had_failure = 1;
 					fprintf(real_stdout, "not ok %lu %s\n  ---\n  message: Test case segfaulted\n  severity: fail\n  ...\n", num_cases, tcase->name);
 					break;
 				}
@@ -136,5 +139,5 @@ int main(int argc, const char **argv) {
 		fputs("0..0\n", real_stdout);
 	}
 
-	return 0;
+	return had_failure;
 }
