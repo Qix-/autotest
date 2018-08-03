@@ -110,30 +110,25 @@ static void discover_symbols(const char *arg0, test_case **cases, const dyn_ent_
 	}
 
 	for (i = 0; i < num_entries; i++) {
-		const char *symname;
-		int skipped = 0;
+		const char *symname = &strtab[symtab[i].st_name];
 
-		symname = &strtab[symtab[i].st_name];
-		skipped = *symname == '_';
-		symname += skipped;
-
-		if (strncmp(symname, "TEST_", 5) == 0) {
+		if (strncmp(&symname[*symname == '_'], "TEST_", 5) == 0) {
+			test_case_fn fn;
 			test_case *c = malloc(sizeof(*c));
-			assert(c != NULL);
 
-			symname += 5;
-			if (strlen(symname) == 0) {
-				continue;
-			}
+			assert(c != NULL);
 
 #			pragma GCC diagnostic push
 #			pragma GCC diagnostic ignored "-Wpedantic"
 #			pragma GCC diagnostic ignored "-Wpointer-arith"
-			c->fn = (void *)(base_addr + symtab[i].st_value);
+			fn = (void *)(base_addr + symtab[i].st_value);
 #			pragma GCC diagnostic pop
-			c->name = symname;
-			c->skipped = skipped;
-			c->next = NULL;
+
+			if (populate_test_case(c, symname, fn) != 0) {
+				/* symbol is malformed */
+				free(c);
+				continue;
+			}
 
 			if (*cases == NULL) {
 				(*cases) = c;

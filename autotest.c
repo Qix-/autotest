@@ -17,10 +17,11 @@
 #define AUTOTEST_BUILDING
 #include "./autotest.h"
 
-static jmp_buf jmpbuf_harness;
-static jmp_buf jmpbuf_test;
+static jmp_buf *jmpbuf_harness;
+static sigjmp_buf *jmpbuf_test;
 static FILE *real_stdout;
 static int real_stdout_fd;
+static struct sigaction sa;
 
 __attribute__((noreturn)) void bailout(const char *fmt, ...) {
 	va_list ap;
@@ -29,23 +30,86 @@ __attribute__((noreturn)) void bailout(const char *fmt, ...) {
 	vfprintf(real_stdout, fmt, ap);
 	va_end(ap);
 	fputs("\n", real_stdout);
-	longjmp(jmpbuf_harness, 1);
+	longjmp(*jmpbuf_harness, 1);
 	__builtin_unreachable();
 }
 
-static void handle_sig(int sig) {
+int populate_test_case(test_case *tcase, const char *name, test_case_fn fn) {
+	if (*name == '\0') return 1;
+
+	tcase->skip = 0;
+	tcase->allow_segv = 0;
+	tcase->allow_abrt = 0;
+	tcase->must_fail = 0;
+	tcase->name = NULL;
+	tcase->next = NULL;
+
+	if (*name == '_') {
+		++name;
+		tcase->skip = 1;
+	}
+
+	if (strncmp(name, "TEST_", 5) == 0) {
+		name += 5;
+	} else {
+		return 1;
+	}
+
+	while (1) {
+		if (strncmp(name, "SEGV_", 5) == 0) {
+			tcase->allow_segv = 1;
+			name += 5;
+			continue;
+		}
+
+		if (strncmp(name, "ABRT_", 5) == 0) {
+			tcase->allow_abrt = 1;
+			name += 5;
+			continue;
+		}
+
+		if (strncmp(name, "FAIL_", 5) == 0) {
+			tcase->must_fail = 1;
+			name += 5;
+			continue;
+		}
+
+		break;
+	}
+
+	if (*name == '\0') {
+		/* don't allow zero-length names */
+		return 1;
+	}
+
+	tcase->name = name;
+	tcase->fn = fn;
+
+	return 0;
+}
+
+__attribute__((noreturn)) static void handle_sig(int sig) {
 	if (sig == SIGSEGV) {
-		longjmp(jmpbuf_test, 2);
+		siglongjmp(*jmpbuf_test, 2);
 	} else if (sig == SIGABRT) {
-		longjmp(jmpbuf_test, 1);
+		siglongjmp(*jmpbuf_test, 1);
 	} else {
 		bailout("Autotest signal handler encountered unknown signal: %s (%d)", strsignal(sig), sig);
 	}
+	__builtin_unreachable();
+}
+
+static void install_sighandlers(void) {
+	sa.sa_handler = handle_sig;
+	sigemptyset(&(sa.sa_mask));
+	if (sigaction(SIGABRT, &sa, NULL) == -1) bailout("Could not install SIGABRT action: %s", strerror(errno));
+	if (sigaction(SIGSEGV, &sa, NULL) == -1) bailout("Could not install SIGSEGV action: %s", strerror(errno));
 }
 
 int main(int argc, const char **argv) {
 	test_case *test_cases;
 	volatile int had_failure = 0;
+	jmp_buf _jmpbuf_harness;
 
 	(void) argc;
 
@@ -69,7 +133,8 @@ int main(int argc, const char **argv) {
 		return 1;
 	}
 
-	if (setjmp(jmpbuf_harness) == 1) {
+	jmpbuf_harness = &_jmpbuf_harness;
+	if (setjmp(_jmpbuf_harness) == 1) {
 		/* bailout() was called */
 		return 1;
 	}
@@ -82,41 +147,63 @@ int main(int argc, const char **argv) {
 		volatile size_t num_cases = 0;
 		const test_case *tcase;
 		const test_case *tcase_tofree;
-		sighandler_t old_handler_segv;
-		sighandler_t old_handler_abrt;
-
-		old_handler_segv = signal(SIGSEGV, &handle_sig);
-		if (old_handler_segv == SIG_ERR) {
-			bailout("Could not set SIGSEGV signal handler: %s", strerror(errno));
-		}
-
-		old_handler_abrt = signal(SIGABRT, &handle_sig);
-		if (old_handler_abrt == SIG_ERR) {
-			bailout("Could not set SIGABRT signal handler: %s", strerror(errno));
-		}
 
 		for (tcase = test_cases; tcase;) {
+			volatile int failed = 0;
+			const char * volatile message = NULL;
 			++num_cases;
 
 			tcase_tofree = NULL;
 
-			if (tcase->skipped) {
-				fprintf(real_stdout, "ok %lu %s # SKIP Symbol prefixed with underscore (_TEST_%s)\n", num_cases, tcase->name, tcase->name);
+			install_sighandlers();
+
+			if (tcase->skip) {
+				fprintf(
+					real_stdout,
+					"ok %lu %s # SKIP Symbol prefixed with underscore (_TEST_%s)\n",
+					num_cases, tcase->name, tcase->name);
 			} else {
-				switch (setjmp(jmpbuf_test)) {
+				sigjmp_buf _jmpbuf_test;
+				jmpbuf_test = &_jmpbuf_test;
+				switch (sigsetjmp(_jmpbuf_test, 1)) {
 				case 0:
 					tcase->fn();
-					fprintf(real_stdout, "ok %lu %s\n", num_cases, tcase->name);
+					failed = 0;
+					message = NULL;
 					break;
-				case 1:
-					had_failure = 1;
-					fprintf(real_stdout, "not ok %lu %s\n  ---\n  message: Test case aborted\n  severity: fail\n  ...\n", num_cases, tcase->name);
+				case 1: /* SIGABRT */
+					failed = !tcase->allow_abrt;
+					message = "Test case aborted";
 					break;
-				case 2:
-					had_failure = 1;
-					fprintf(real_stdout, "not ok %lu %s\n  ---\n  message: Test case segfaulted\n  severity: fail\n  ...\n", num_cases, tcase->name);
+				case 2: /* SIGSEGV */
+					failed = !tcase->allow_segv;
+					message = "Test case encountered a segfault";
 					break;
 				}
+
+				if (tcase->must_fail == failed) {
+					failed = 0;
+					fprintf(
+						real_stdout,
+						"ok %lu %s\n",
+						num_cases, tcase->name);
+				} else if (tcase->must_fail && !failed) {
+					failed = 1;
+					fprintf(
+						real_stdout,
+						"not ok %lu %s\n  ---\n  message: Test case was expected to fail\n  severity: fail\n  ...\n",
+						num_cases, tcase->name);
+				} /* else case handled above */
+
+				if (message != NULL) {
+					fprintf(
+						real_stdout,
+						"  ---\n  message: %s\n  severity: %s\n  ...\n",
+						message,
+						failed ? "fail" : "comment");
+				}
+
+				had_failure = had_failure || failed;
 			}
 
 			tcase_tofree = tcase;
@@ -125,13 +212,6 @@ int main(int argc, const char **argv) {
 
 			fflush(stderr);
 			fflush(real_stdout);
-		}
-
-		if (signal(SIGSEGV, old_handler_segv) == SIG_ERR) {
-			fprintf(stderr, "%s: warning: could not restore SIGSEGV signal handler: %s\n", argv[0], strerror(errno));
-		}
-		if (signal(SIGABRT, old_handler_abrt) == SIG_ERR) {
-			fprintf(stderr, "%s: warning: could not restore SIGABRT signal handler: %s\n", argv[0], strerror(errno));
 		}
 
 		fprintf(real_stdout, "1..%lu\n", num_cases);
