@@ -7,7 +7,8 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "./test-case.h"
+#define AUTOTEST_BUILDING
+#include "./autotest.h"
 
 #if __BYTE_ORDER == __LITTLE_ENDIAN
 #	define ELFDATANATIVE ELFDATA2LSB

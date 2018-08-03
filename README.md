@@ -1,7 +1,7 @@
 # Autotest
 
 Autotest is a minimalistic testing framework written in ANSI C (C89/C90)
-for UNIX-based systems.
+for ELF-based executables.
 
 ```c
 /* test-foo.c */
@@ -19,14 +19,14 @@ void TEST_bar(void) {
 ```console
 $ cc -o test-foo test-foo.c -lautotest
 $ ./test-foo
-
-  ✔  PASS foo
-  ✕  FAIL bar - assertion failed: 15 == 10 (test-foo.c line 9)
-
-  1 passed
-  1 failed
-
-  TESTS FAIL
+TAP version 13
+ok 1 foo
+not ok 2 bar
+  ---
+  message: "assertion failed: 15 == 10 (test-foo.c line 9)"
+  severity: "fail"
+  ...
+1..2
 ```
 
 ## Usage
@@ -51,12 +51,15 @@ $ cmake .. -DCMAKE_BUILD_TYPE=Debug -DBUILD_TESTING=On
 ## FAQ
 Some (not-so-)frequently asked questions and their answers.
 
-#### Will this work on non-UNIX platforms?
+#### Does this work on MacOS?
 
-No - at least not without modification. If you want to add a new platform that doesn't
-support enumerating symbols using `nm`'s method or doesn't allow referencing symbols
-using `libdl` (`dlsym`, etc.) then you'll need to add a custom test case enumerator
-(and submit a PR, if you would!).
+No; MacOS uses Mach-O files, not ELF. If you want to submit a PR that enumerates
+Mach-O symbols, feel free to submit a PR!
+
+#### Does this work on Windows?
+
+No; Windows has an entirely different API for symbol enumeration and requires a .pdb file.
+If you want to submit a PR that handles all of this, we'd be very appreciative.
 
 #### Can I prefix test cases with `static`?
 
@@ -81,17 +84,20 @@ however, I feel that test cases can bypass this convention without suffering any
 To further complement this opinion, writing tests is generally considered tedious and boring, so
 I feel the less time taken to set up testing and all of the surrounding harnesses, the better.
 
-#### Why not default to TAP?
+#### Why the default of TAP?
 
-Because there aren't enough obvious choices in TAP consumers, and none that we've found we've liked enough
-to actively recommend or push.
+Output formats are subjective, and there are [quite a lot of things](https://github.com/sindresorhus/awesome-tap#reporters)
+that work with TAP output.
 
-Feel free to submit a pull request adding a list to this README with your favorite.
+Plus, it was easier to implement.
 
-#### Is Autotest's use of `fork()` required?
+#### Why does Autotest route all stdout to stderr?
 
-No, but it allows Autotest to make the output a bit cleaner. If the use of `fork()` is causing
-issues, pass `--verbose` as it's the only way to avoid `fork()`-ing.
+Because according to the [TAP Version 13 Specification](https://testanything.org/tap-version-13-specification.html),
+all extraneous lines of output must be routed to stderr. Consumers of the TAP data must only use stdout.
+
+If this messes with your tests, you're probably using an anti-pattern and thus we probably won't support
+your use-case (but feel free to open an issue anyway).
 
 # License
 
