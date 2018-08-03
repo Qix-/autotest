@@ -4,8 +4,10 @@
 #include <link.h>
 #include <stdint.h>
 #include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 
-typedef void (test_case)(void);
+#include "./test-case.h"
 
 #if __BYTE_ORDER == __LITTLE_ENDIAN
 #	define ELFDATANATIVE ELFDATA2LSB
@@ -33,7 +35,7 @@ typedef void (test_case)(void);
 #	endif
 #endif
 
-static int discover_symbols(const char *arg0, test_case **cases, const dyn_ent_t *dynent) {
+static int discover_symbols(const char *arg0, test_case **cases, const dyn_ent_t *dynent, void *base_addr) {
 	int status = 1;
 	const sym_ent_t *symtab = NULL;
 	const char *strtab = NULL;
@@ -42,8 +44,9 @@ static int discover_symbols(const char *arg0, test_case **cases, const dyn_ent_t
 	int hashtable_type = 0;
 	size_t i;
 	size_t num_entries = 0;
+	test_case *tcase = NULL;
 
-	(void) cases; /* XXX DEBUG */
+	*cases = NULL;
 
 	for (; dynent->d_tag != DT_NULL; ++dynent) {
 		switch (dynent->d_tag) {
@@ -60,15 +63,6 @@ static int discover_symbols(const char *arg0, test_case **cases, const dyn_ent_t
 			break;
 		case DT_SYMTAB:
 			symtab = (void *) dynent->d_un.d_ptr;
-			break;
-		case DT_RELA:
-			puts("RELA");
-			break;
-		case DT_REL:
-			puts("REL");
-			break;
-		case DT_RELACOUNT:
-			puts("DT_RELACOUNT");
 			break;
 		default:
 			break;
@@ -126,7 +120,39 @@ static int discover_symbols(const char *arg0, test_case **cases, const dyn_ent_t
 	}
 
 	for (i = 0; i < num_entries; i++) {
-		printf("\t%u\t%u\t%s\n", ELF32_ST_TYPE(symtab[i].st_info), symtab[i].st_name, &strtab[symtab[i].st_name]);
+		const char *symname;
+		int skipped = 0;
+
+		symname = &strtab[symtab[i].st_name];
+		skipped = *symname == '_';
+		symname += skipped;
+
+		if (strncmp(symname, "TEST_", 5) == 0) {
+			test_case *c = malloc(sizeof(*c));
+			assert(c != NULL);
+
+			symname += 5;
+			if (strlen(symname) == 0) {
+				continue;
+			}
+
+#			pragma GCC diagnostic push
+#			pragma GCC diagnostic ignored "-Wpedantic"
+#			pragma GCC diagnostic ignored "-Wpointer-arith"
+			c->fn = (void *)(base_addr + symtab[i].st_value);
+#			pragma GCC diagnostic pop
+			c->name = symname;
+			c->skipped = skipped;
+			c->next = NULL;
+
+			if (*cases == NULL) {
+				(*cases) = c;
+			} else {
+				tcase->next = c;
+			}
+
+			tcase = c;
+		}
 	}
 
 	status = 0;
@@ -146,7 +172,7 @@ int discover_tests(const char *arg0, test_case **cases) {
 
 	while (map->l_prev) map = map->l_prev;
 
-	if (discover_symbols(arg0, cases, map->l_ld) != 0) {
+	if (discover_symbols(arg0, cases, map->l_ld, (void *) map->l_addr) != 0) {
 		/* error already emitted */
 		goto exit;
 	}

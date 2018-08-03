@@ -1,8 +1,9 @@
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
 
-typedef void (test_case)(void);
+#include "./test-case.h"
 
 extern int discover_tests(const char *arg0, test_case **cases);
 
@@ -36,6 +37,12 @@ int main(int argc, const char **argv) {
 	if (test_cases != 0) {
 		/* test case discovery should have printed the error already */
 		return result;
+	}
+
+	if (test_cases) {
+		free(test_cases);
+	} else {
+		fprintf(stderr, "%s: warning: no test cases\n", argv[0]);
 	}
 
 	return 0;
