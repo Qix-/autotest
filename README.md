@@ -137,6 +137,3 @@ your use-case (but feel free to open an issue anyway).
 
 Autotest is copyright &copy; 2018 by Josh Junon and released under the MIT License. Unless
 otherwise noted, all code included herein is licensed as such.
-
-Certain functionality included is licensed (and compliant) under the
-[APSL 2.0](https://opensource.apple.com/apsl) and is noted as such.
