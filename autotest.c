@@ -181,6 +181,8 @@ int main(int argc, const char **argv) {
 					break;
 				}
 
+				fflush(stderr);
+
 				if (tcase->must_fail == failed) {
 					failed = 0;
 					fprintf(
@@ -210,7 +212,6 @@ int main(int argc, const char **argv) {
 			tcase = tcase->next;
 			free((void *) tcase_tofree);
 
-			fflush(stderr);
 			fflush(real_stdout);
 		}
 
