@@ -13,6 +13,11 @@ endif ()
 
 add_library (autotest STATIC autotest.c autotest-unix.c)
 target_link_libraries(autotest dl)
+if ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
+	# man 3 mcheck
+	# only on glibc
+	target_link_libraries(autotest mcheck)
+endif ()
 
 if (BUILD_TESTING)
 	enable_testing ()
