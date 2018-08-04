@@ -189,20 +189,39 @@ int main(int argc, const char **argv) {
 						real_stdout,
 						"ok %lu %s\n",
 						num_cases, tcase->name);
+
+					if (message != NULL) {
+						fprintf(
+							real_stdout,
+							"  ---\n  message: %s\n  severity: comment\n  ...\n",
+							message);
+					}
 				} else if (tcase->must_fail && !failed) {
 					failed = 1;
 					fprintf(
 						real_stdout,
 						"not ok %lu %s\n  ---\n  message: Test case was expected to fail\n  severity: fail\n  ...\n",
 						num_cases, tcase->name);
-				} /* else case handled above */
 
-				if (message != NULL) {
+					if (message != NULL) {
+						fprintf(
+							real_stdout,
+							"  ---\n  message: %s\n  severity: comment\n  ...\n",
+							message);
+					}
+				} else {
+					failed = 1;
 					fprintf(
 						real_stdout,
-						"  ---\n  message: %s\n  severity: %s\n  ...\n",
-						message,
-						failed ? "fail" : "comment");
+						"not ok %lu %s\n",
+						num_cases, tcase->name);
+
+					if (message != NULL) {
+						fprintf(
+							real_stdout,
+							"  ---\n  message: %s\n  severity: fail\n  ...\n",
+							message);
+					}
 				}
 
 				had_failure = had_failure || failed;
