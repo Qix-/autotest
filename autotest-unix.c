@@ -1,5 +1,6 @@
 #define _GNU_SOURCE
 #include <assert.h>
+#include <dlfcn.h>
 #include <elf.h>
 #include <link.h>
 #include <stdint.h>
