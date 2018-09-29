@@ -54,17 +54,17 @@ static void discover_symbols(const char *arg0, test_case **cases, const dyn_ent_
 		switch (dynent->d_tag) {
 		case DT_HASH:
 			hashtable_type = 1;
-			hashtable = (void *) dynent->d_un.d_ptr;
+			hashtable = base_addr + dynent->d_un.d_ptr;
 			break;
 		case DT_GNU_HASH:
 			hashtable_type = 2;
-			hashtable = (void *) dynent->d_un.d_ptr;
+			hashtable = base_addr + dynent->d_un.d_ptr;
 			break;
 		case DT_STRTAB:
-			strtab = (void *) dynent->d_un.d_ptr;
+			strtab = base_addr + dynent->d_un.d_ptr;
 			break;
 		case DT_SYMTAB:
-			symtab = (void *) dynent->d_un.d_ptr;
+			symtab = base_addr + dynent->d_un.d_ptr;
 			break;
 		default:
 			break;
