@@ -88,7 +88,7 @@ Some (not-so-)frequently asked questions and their answers.
 #### Does this work on MacOS?
 
 No; MacOS uses Mach-O files, not ELF. If you want to submit a PR that enumerates
-Mach-O symbols, feel free to submit a PR!
+Mach-O symbols, feel free!
 
 #### Does this work on Windows?
 
