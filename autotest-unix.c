@@ -50,21 +50,48 @@ static void discover_symbols(const char *arg0, test_case **cases, const dyn_ent_
 
 	*cases = NULL;
 
+
+	/*
+		TODO fixme The pointer offset branch (where we add base_addr below)
+		is an unreliable hack.
+
+		I can't figure out the logic here to determine if
+		you need to add the base address or not. On some systems
+		in ubuntu, you don't. Most other systems, you do.
+		In the man pages, you do. I think it's a bug in an implementation
+		somewhere due to poor standardization of the hashtables / ELF format.
+
+		If you know more about this, please let me know. Check the Dockerfile
+		and see that removing the offset addition breaks Alpine and adding it
+		(unconditionally) breaks Ubuntu. Further, base_addr is 0x0 on my vbox
+		Ubuntu machine I was originally testing on.
+
+		Note to system developers: this is why people are scared of native.
+	*/
+
 	for (; dynent->d_tag != DT_NULL; ++dynent) {
 		switch (dynent->d_tag) {
 		case DT_HASH:
 			hashtable_type = 1;
-			hashtable = base_addr + dynent->d_un.d_ptr;
+			hashtable = (size_t) dynent->d_un.d_ptr < (size_t) base_addr
+				? &(((char *)base_addr)[dynent->d_un.d_ptr])
+				: (void*) dynent->d_un.d_ptr;
 			break;
 		case DT_GNU_HASH:
 			hashtable_type = 2;
-			hashtable = base_addr + dynent->d_un.d_ptr;
+			hashtable = (size_t) dynent->d_un.d_ptr < (size_t) base_addr
+				? &(((char *)base_addr)[dynent->d_un.d_ptr])
+				: (void*) dynent->d_un.d_ptr;
 			break;
 		case DT_STRTAB:
-			strtab = base_addr + dynent->d_un.d_ptr;
+			strtab = (size_t) dynent->d_un.d_ptr < (size_t) base_addr
+				? &(((char *)base_addr)[dynent->d_un.d_ptr])
+				: (void*) dynent->d_un.d_ptr;
 			break;
 		case DT_SYMTAB:
-			symtab = base_addr + dynent->d_un.d_ptr;
+			symtab = (size_t) dynent->d_un.d_ptr < (size_t) base_addr
+				? &(((char *)base_addr)[dynent->d_un.d_ptr])
+				: (void*) dynent->d_un.d_ptr;
 			break;
 		default:
 			break;
