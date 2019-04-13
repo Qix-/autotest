@@ -168,14 +168,20 @@ int main(int argc, const char **argv) {
 				switch (sigsetjmp(_jmpbuf_test, 1)) {
 				case 0:
 					tcase->fn();
+					fflush(stderr);
+					fflush(stdout);
 					failed = 0;
 					message = NULL;
 					break;
 				case 1: /* SIGABRT */
+					fflush(stderr);
+					fflush(stdout);
 					failed = !tcase->allow_abrt;
 					message = "Test case aborted";
 					break;
 				case 2: /* SIGSEGV */
+					fflush(stderr);
+					fflush(stdout);
 					failed = !tcase->allow_segv;
 					message = "Test case encountered a segfault";
 					break;
