@@ -1,3 +1,10 @@
+
+> **This project has been archived.** Years later and having written several test frameworks since,
+> I've come to realize that this is a terrible way to construct tests cases. Please don't use this
+> in any new projects. I urge you, dear reader, not to go down this path of cursed test harness approaches.
+
+---
+
 # Autotest
 
 Autotest is a minimalistic testing framework written in ANSI C (C89/C90)
